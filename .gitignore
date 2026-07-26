@@ -1,6 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+
+# Environment / secrets
+.env
+backend/.env
+
+# Generated EnergyPlus output
+data/ep_output/
+data/ep_5zone_test/
+data/ep_test/
+data/*.db
+data/*.log
+data/*.sql
+
+# Runtime artifacts
+*.log
+
+# Frontend build / dependencies
 node_modules/
 frontend/node_modules/
-.env
-venv/
-__pycache__/
-*.pyc
+frontend/dist/
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.user

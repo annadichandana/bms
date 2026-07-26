@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import os
 
-DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")
+DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
 
 def add_dashboard_routes(app):
     @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)

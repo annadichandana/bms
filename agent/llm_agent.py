@@ -27,13 +27,14 @@ import os
 import re
 import time
 from typing import Any, Dict, Optional, Tuple
+import random
 
 import httpx
 
-from mcp.mcp_tools import OPENAI_TOOLS_SCHEMA, call_tool
+from bms.mcp_tools import OPENAI_TOOLS_SCHEMA, call_tool
 from agent.prompt_templates import SYSTEM_PROMPT, build_user_prompt
 from agent.safety import validate_llm_actions
-from mcp.building_state import OPTIMIZATION_GOALS, DEFAULT_CONTROLS
+from bms.building_state import OPTIMIZATION_GOALS, DEFAULT_CONTROLS
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ PRIMARY_MODEL   = "phi3:mini"
 FALLBACK_MODELS = ["llama3.2:3b", "llama3:latest", "mistral:latest", "gemma2:2b"]
 LLM_TIMEOUT     = 90   # seconds
 
-MAX_TOOL_ITERATIONS = 6   # max tool call rounds per decision cycle
+MAX_TOOL_ITERATIONS = 4   # max tool call rounds per decision cycle (keep within 12k TPM free tier)
 
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ class ARIAAgent:
     def _probe_groq(self):
         """Check if Groq API key is configured and reachable."""
         if not GROQ_API_KEY or GROQ_API_KEY in ("", "your_key_here"):
-            logger.info("Groq API key not set — skipping Groq.")
+            logger.info("Groq API key not set - skipping Groq.")
             return
         try:
             resp = self._http.get(
@@ -96,7 +97,7 @@ class ARIAAgent:
             if resp.status_code == 200:
                 self.groq_available = True
                 logger.info(
-                    "✅ Groq connected — model: %s (with MCP tool calling)", GROQ_MODEL
+                    "[OK] Groq connected - model: %s (with MCP tool calling)", GROQ_MODEL
                 )
         except Exception as e:
             logger.warning("Groq not reachable (%s). Will try Ollama.", e)
@@ -119,7 +120,7 @@ class ARIAAgent:
                             break
                 if self.ollama_model:
                     self.ollama_available = True
-                    logger.info("✅ Ollama — using model: %s", self.ollama_model)
+                    logger.info("[OK] Ollama - using model: %s", self.ollama_model)
                 else:
                     logger.warning("Ollama running but no compatible model. Run: ollama pull phi3:mini")
         except Exception as e:
@@ -186,27 +187,52 @@ class ARIAAgent:
         final_reasoning_parts = []
 
         for iteration in range(MAX_TOOL_ITERATIONS):
-            try:
-                resp = self._http.post(
-                    f"{GROQ_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {GROQ_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": GROQ_MODEL,
-                        "messages": messages,
-                        "tools": OPENAI_TOOLS_SCHEMA,
-                        "tool_choice": "auto",
-                        "temperature": 0.15,
-                        "max_tokens": 1024,
-                    },
-                    timeout=LLM_TIMEOUT,
-                )
-            except httpx.TimeoutException:
-                logger.warning("Groq request timed out at iteration %d", iteration)
-                break
+            # Retry on 429 with exponential backoff (free tier: 12k TPM)
+            for attempt in range(3):
+                try:
+                    resp = self._http.post(
+                        f"{GROQ_BASE_URL}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {GROQ_API_KEY}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": GROQ_MODEL,
+                            "messages": messages,
+                            "tools": OPENAI_TOOLS_SCHEMA,
+                            "tool_choice": "auto",
+                            "temperature": 0.15,
+                            "max_tokens": 800,
+                        },
+                        timeout=LLM_TIMEOUT,
+                    )
+                except httpx.TimeoutException:
+                    logger.warning("Groq request timed out at iteration %d", iteration)
+                    resp = None
+                    break
 
+                if resp.status_code == 429:
+                    # Parse retry-after from response if available
+                    retry_after = 15 + attempt * 10 + random.uniform(0, 3)
+                    try:
+                        err = resp.json()
+                        msg_text = err.get("error", {}).get("message", "")
+                        import re as _re
+                        m = _re.search(r"try again in ([0-9.]+)s", msg_text)
+                        if m:
+                            retry_after = float(m.group(1)) + 1.0
+                    except Exception:
+                        pass
+                    logger.warning(
+                        "Groq rate limited (429) at iteration %d — retrying in %.1fs",
+                        iteration, retry_after
+                    )
+                    time.sleep(retry_after)
+                    continue
+                break  # Non-429 response, exit retry loop
+
+            if resp is None:
+                break
             if resp.status_code != 200:
                 raise RuntimeError(f"Groq API HTTP {resp.status_code}: {resp.text[:300]}")
 

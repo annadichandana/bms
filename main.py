@@ -30,7 +30,7 @@ import os
 import sys
 import webbrowser
 from datetime import datetime
-from pathlib import Path
+
 
 # ── Windows UTF-8 fix ─────────────────────────────────────────────────────────
 if sys.platform == "win32":
@@ -42,13 +42,13 @@ if sys.platform == "win32":
 
 # ── Load environment ──────────────────────────────────────────────────────────
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / "backend" / ".env", override=False)
 load_dotenv(override=False)
+
 
 import uvicorn
 
 from simulation.energyplus_bridge import EnergyPlusBridge
-from mcp.building_state import state_store, DEFAULT_CONTROLS, BASELINE_CONTROLS as BC
+from bms.building_state import state_store, DEFAULT_CONTROLS, BASELINE_CONTROLS as BC
 from agent.llm_agent import ARIAAgent
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ async def run_baseline(
 ) -> list:
     """Run fixed-setpoint baseline (no AI). Returns list of hourly results."""
     logger.info("=" * 66)
-    logger.info("PHASE 1: BASELINE SIMULATION (Fixed Setpoints — No AI)")
+    logger.info("PHASE 1: BASELINE SIMULATION (Fixed Setpoints - No AI)")
     logger.info("=" * 66)
 
     results = []
@@ -286,7 +286,7 @@ async def main(
     logger.info("Simulation mode: %s", bridge.mode.upper())
 
     # ── Start FastAPI + MCP server ────────────────────────────────────────
-    from mcp.server import app
+    from bms.server import app
     config = uvicorn.Config(
         app,
         host="0.0.0.0",
@@ -325,7 +325,7 @@ async def main(
     bridge.reset()  # Reset bridge for AI run
     await run_ai_optimized(hours, baseline_results, epoch_delay, bridge)
 
-    logger.info("Simulation done! Dashboard is still live → http://localhost:8000/dashboard")
+    logger.info("Simulation done! Dashboard is still live -> http://localhost:8000/dashboard")
     logger.info("Press Ctrl+C to stop.")
     await server_task
 

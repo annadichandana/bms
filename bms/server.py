@@ -32,13 +32,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from mcp.building_state import state_store, OPTIMIZATION_GOALS
-from mcp.mcp_tools import (
+from bms.building_state import state_store, OPTIMIZATION_GOALS
+from bms.mcp_tools import (
     OPENAI_TOOLS_SCHEMA, call_tool, MCP_AVAILABLE,
     _tool_get_zone_status, _tool_get_all_zones_status,
 )
 
-DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), "..", "dashboard", "index.html")
+DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
 
 logger = logging.getLogger(__name__)
 

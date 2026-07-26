@@ -49,24 +49,8 @@ EP_SEARCH_PATHS = [
 
 def _find_energyplus() -> Optional[Path]:
     """Search common install paths and ENERGYPLUS_DIR env variable."""
-    # 1. Explicit env override
-    env_path = os.environ.get("ENERGYPLUS_DIR")
-    if env_path and Path(env_path).exists():
-        return Path(env_path)
-
-    # 2. Search well-known paths
-    for p in EP_SEARCH_PATHS:
-        if p.exists() and (p / "energyplus").exists() or (p / "energyplus.exe").exists():
-            return p
-
-    # 3. Check if pyenergyplus is on sys.path already
-    try:
-        import pyenergyplus  # noqa: F401
-        return Path("system")
-    except ImportError:
-        pass
-
-    return None
+    from simulation.energyplus_subprocess import find_energyplus_dir
+    return find_energyplus_dir()
 
 
 class EnergyPlusBridge:
@@ -92,16 +76,27 @@ class EnergyPlusBridge:
         self._co_sim_step_event = threading.Event()
         self._pending_setpoints: Dict[str, float] = {}
         self._pending_lighting: Dict[str, float] = {}
+        self._subprocess_runner = None
 
         # Fallback simulator
         from simulation.building_sim import BuildingSimulator
         self._mock_sim = BuildingSimulator()
 
-        # Try EnergyPlus
+        # Try EnergyPlus (pyenergyplus co-sim, then subprocess, then physics mock)
         ep_dir = _find_energyplus()
-        if ep_dir and ep_dir != Path("system"):
+        if ep_dir:
             sys.path.insert(0, str(ep_dir))
-        self._try_init_energyplus(ep_dir)
+            from simulation.energyplus_subprocess import pyenergyplus_compatible
+            compatible, reason = pyenergyplus_compatible(ep_dir)
+            if compatible:
+                self._try_init_energyplus(ep_dir)
+            else:
+                logger.warning("pyenergyplus unavailable (%s) — using subprocess runner", reason)
+                self._try_init_subprocess(ep_dir)
+        else:
+            logger.warning(
+                "EnergyPlus not found. Running physics mock. Set ENERGYPLUS_DIR in backend/.env"
+            )
 
     def _try_init_energyplus(self, ep_dir: Optional[Path]):
         """Attempt to import and initialise the EnergyPlus Python API."""
@@ -110,16 +105,25 @@ class EnergyPlusBridge:
             self._ep_api = EnergyPlusAPI()
             self._ep_available = True
             self.mode = "energyplus"
-            logger.info("✅ EnergyPlus Python API found — using real co-simulation")
+            logger.info("[OK] EnergyPlus Python API found - using real co-simulation")
             self._start_ep_thread()
         except ImportError:
-            logger.warning(
-                "⚠️  pyenergyplus not found. Running with physics-based mock simulator.\n"
-                "    To enable real EnergyPlus: install EnergyPlus 23.1+ and set ENERGYPLUS_DIR."
-            )
-            self.mode = "physics_mock"
+            logger.warning("pyenergyplus not found — trying subprocess runner")
+            self._try_init_subprocess(ep_dir)
         except Exception as e:
-            logger.error("EnergyPlus init error: %s — using mock fallback", e)
+            logger.error("EnergyPlus init error: %s — trying subprocess", e)
+            self._try_init_subprocess(ep_dir)
+
+    def _try_init_subprocess(self, ep_dir: Optional[Path]):
+        """Fall back to energyplus.exe subprocess + SQL output parsing."""
+        try:
+            from simulation.energyplus_subprocess import EnergyPlusSubprocessRunner
+            self._subprocess_runner = EnergyPlusSubprocessRunner()
+            self._ep_available = True
+            self.mode = "energyplus"
+            logger.info("EnergyPlus subprocess mode active (real simulation data via eplusout.sql)")
+        except Exception as e:
+            logger.error("EnergyPlus subprocess init failed: %s — using physics mock", e)
             self.mode = "physics_mock"
 
     # ── EnergyPlus co-simulation thread ─────────────────────────────────────
@@ -269,9 +273,28 @@ class EnergyPlusBridge:
         (compatible with both EnergyPlus and physics mock).
         """
         if self.mode == "energyplus" and self._ep_available:
+            if self._subprocess_runner is not None:
+                return self._subprocess_step(
+                    hour, hvac_setpoints, lighting_levels, ventilation_rates
+                )
             return self._ep_step(hour, hvac_setpoints, lighting_levels, ventilation_rates)
         else:
             return self._mock_sim.step(hour, hvac_setpoints, lighting_levels, ventilation_rates)
+
+    def _subprocess_step(
+        self,
+        hour: float,
+        hvac_setpoints: Dict[str, float],
+        lighting_levels: Dict[str, float],
+        ventilation_rates: Dict[str, float],
+    ) -> dict:
+        """One step via EnergyPlus subprocess (real eplusout.sql data)."""
+        controls = {
+            "hvac_setpoints": hvac_setpoints,
+            "lighting_levels": lighting_levels,
+            "ventilation_rates": ventilation_rates,
+        }
+        return self._subprocess_runner.step(hour, controls)
 
     def _ep_step(
         self,
@@ -313,17 +336,24 @@ class EnergyPlusBridge:
     def reset(self):
         """Reset simulation to initial state."""
         self._mock_sim.reset()
-        if self.mode == "energyplus":
-            logger.info("EnergyPlus thread reset not supported mid-run; using mock reset.")
-            self.mode = "physics_mock"
+        if self._subprocess_runner is not None:
+            self._subprocess_runner.reset()
+        elif self.mode == "energyplus":
+            logger.info("EnergyPlus co-sim thread reset not supported mid-run.")
 
     def get_current_state(self) -> dict:
+        if self._subprocess_runner and self._subprocess_runner.hourly_cache:
+            return self._subprocess_runner.hourly_cache[-1]
         return self._mock_sim.get_current_state()
 
     @property
     def total_energy_kwh(self) -> float:
+        if self._subprocess_runner is not None:
+            return self._subprocess_runner.total_energy_kwh
         return self._mock_sim.total_energy_kwh
 
     @property
     def total_carbon_kg(self) -> float:
+        if self._subprocess_runner is not None:
+            return self._subprocess_runner.total_carbon_kg
         return self._mock_sim.total_carbon_kg

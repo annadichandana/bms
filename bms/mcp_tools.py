@@ -38,18 +38,21 @@ logger = logging.getLogger(__name__)
 
 # ── Try to import FastMCP (official MCP SDK) ─────────────────────────────────
 try:
-    from mcp.server.fastmcp import FastMCP
+    # The official `mcp` package is installed; our local package is now named `bms`
+    import importlib
+    _mcp_sdk = importlib.import_module("mcp.server.fastmcp")
+    FastMCP = _mcp_sdk.FastMCP
     MCP_AVAILABLE = True
-    logger.info("✅ Official MCP SDK (FastMCP) loaded")
-except ImportError:
+    logger.info("[OK] Official MCP SDK (FastMCP) loaded")
+except (ImportError, ModuleNotFoundError, AttributeError):
     MCP_AVAILABLE = False
     logger.warning(
-        "⚠️  `mcp` package not installed. Run: pip install mcp\n"
+        "[WARN] `mcp` package not installed. Run: pip install mcp\n"
         "    Falling back to REST-based MCP-compatible interface."
     )
     FastMCP = None
 
-from mcp.building_state import state_store, OPTIMIZATION_GOALS
+from bms.building_state import state_store, OPTIMIZATION_GOALS
 from simulation.building_sim import (
     outdoor_temperature, occupancy_fraction, ZONES
 )

@@ -21,6 +21,7 @@ Tools exposed:
   set_ventilation_rate(zone_id, r)  — m³/s per person
   trigger_demand_response(zones)    — Emergency load shedding
   get_comfort_score()               — Zone-by-zone comfort (0–100)
+  validate_action(...)              — Validate proposed values vs safety bounds
 
 Transport:
   The MCP server runs over HTTP/SSE (Server-Sent Events) so the agent
@@ -57,7 +58,9 @@ from simulation.building_sim import (
     outdoor_temperature, occupancy_fraction, ZONES
 )
 from agent.safety import (
-    clamp_setpoints, clamp_lighting, clamp_ventilation, VALID_ZONES
+    clamp_setpoints, clamp_lighting, clamp_ventilation, VALID_ZONES,
+    clamp_setpoints_with_audit, clamp_lighting_with_audit, clamp_ventilation_with_audit,
+    SETPOINT_MIN, SETPOINT_MAX, LIGHTING_MIN, LIGHTING_MAX, VENTILATION_MIN, VENTILATION_MAX,
 )
 
 # ── Allowed values ────────────────────────────────────────────────────────────
@@ -372,6 +375,71 @@ def _tool_get_comfort_score() -> Dict[str, Any]:
     }
 
 
+def _tool_validate_action(
+    hvac_setpoints: Optional[Dict[str, float]] = None,
+    lighting_levels: Optional[Dict[str, float]] = None,
+    ventilation_rates: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Validate proposed control values against safety constraints.
+
+    Returns audit events for any values that would be clamped.
+    Does NOT apply the values — only validates and reports.
+
+    Used in the VALIDATE step of the OBSERVE→REASON→ACT→VALIDATE→LEARN loop.
+    """
+    all_events = []
+    results = {}
+
+    if hvac_setpoints:
+        clamped_hvac, hvac_events = clamp_setpoints_with_audit(hvac_setpoints)
+        results["hvac"] = {
+            "proposed": hvac_setpoints,
+            "safe": clamped_hvac,
+            "clamped_count": len(hvac_events),
+            "bounds": f"{SETPOINT_MIN}–{SETPOINT_MAX}°C",
+        }
+        all_events.extend(hvac_events)
+
+    if lighting_levels:
+        clamped_light, light_events = clamp_lighting_with_audit(lighting_levels)
+        results["lighting"] = {
+            "proposed": lighting_levels,
+            "safe": clamped_light,
+            "clamped_count": len(light_events),
+            "bounds": f"{LIGHTING_MIN}–{LIGHTING_MAX}%",
+        }
+        all_events.extend(light_events)
+
+    if ventilation_rates:
+        clamped_vent, vent_events = clamp_ventilation_with_audit(ventilation_rates)
+        results["ventilation"] = {
+            "proposed": ventilation_rates,
+            "safe": clamped_vent,
+            "clamped_count": len(vent_events),
+            "bounds": f"{VENTILATION_MIN}–{VENTILATION_MAX} m³/s",
+        }
+        all_events.extend(vent_events)
+
+    safe = len(all_events) == 0
+    return {
+        "safe": safe,
+        "override_count": len(all_events),
+        "events": all_events,
+        "results": results,
+        "message": (
+            "All proposed values are within safety constraints."
+            if safe else
+            f"{len(all_events)} value(s) would be clamped to safe operating range."
+        ),
+        "ashrae_bounds": {
+            "hvac": f"{SETPOINT_MIN}–{SETPOINT_MAX}°C",
+            "lighting": f"{LIGHTING_MIN}–{LIGHTING_MAX}%",
+            "ventilation": f"{VENTILATION_MIN}–{VENTILATION_MAX} m³/s",
+        },
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Register tools with FastMCP (when official SDK is available)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -486,6 +554,19 @@ if MCP_AVAILABLE and mcp is not None:
         Includes PMV, CO₂, temperature, ASHRAE 55 compliance flag per zone.
         """
         return _tool_get_comfort_score()
+
+    @mcp.tool()
+    def validate_action(
+        hvac_setpoints: Optional[Dict[str, float]] = None,
+        lighting_levels: Optional[Dict[str, float]] = None,
+        ventilation_rates: Optional[Dict[str, float]] = None,
+    ) -> dict:
+        """
+        Validate proposed control values against ASHRAE safety constraints.
+        Returns audit events for any values that would be clamped.
+        Does NOT apply values — use set_* tools to apply after validation.
+        """
+        return _tool_validate_action(hvac_setpoints, lighting_levels, ventilation_rates)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -678,6 +759,30 @@ OPENAI_TOOLS_SCHEMA = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "validate_action",
+            "description": "Validate proposed HVAC/lighting/ventilation values against ASHRAE safety bounds. Returns audit events.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "hvac_setpoints": {
+                        "type": "object",
+                        "description": "Proposed HVAC setpoints per zone",
+                    },
+                    "lighting_levels": {
+                        "type": "object",
+                        "description": "Proposed lighting levels per zone (0–100%)",
+                    },
+                    "ventilation_rates": {
+                        "type": "object",
+                        "description": "Proposed ventilation rates per zone (m³/s)",
+                    },
+                },
+            },
+        },
+    },
 ]
 
 
@@ -699,16 +804,43 @@ TOOL_REGISTRY = {
     "set_ventilation_rate":    lambda args: _tool_set_ventilation_rate(**args),
     "trigger_demand_response": lambda args: _tool_trigger_demand_response(**args),
     "get_comfort_score":       lambda args: _tool_get_comfort_score(),
+    "validate_action":         lambda args: _tool_validate_action(**args),
+}
+
+# ── Tool category mapping for call counting ───────────────────────────────────
+TOOL_CATEGORY = {
+    "get_zone_status":          "observation",
+    "get_all_zones_status":     "observation",
+    "get_energy_metrics":       "observation",
+    "get_optimization_goals":   "observation",
+    "get_weather_forecast":     "observation",
+    "get_occupancy_schedule":   "observation",
+    "get_optimization_history": "decision",
+    "get_comfort_score":        "decision",
+    "set_hvac_setpoint":        "control",
+    "set_hvac_mode":            "control",
+    "set_lighting_level":       "control",
+    "set_ventilation_rate":     "control",
+    "trigger_demand_response":  "control",
+    "validate_action":          "validation",
 }
 
 
 def call_tool(tool_name: str, args: dict) -> dict:
-    """Universal tool dispatcher — call any MCP tool by name with arguments."""
+    """
+    Universal tool dispatcher — call any MCP tool by name with arguments.
+
+    Every call is logged with [MCP TOOL] prefix for traceability.
+    """
     handler = TOOL_REGISTRY.get(tool_name)
     if not handler:
         return {"error": f"Unknown tool: {tool_name}. Available: {list(TOOL_REGISTRY.keys())}"}
     try:
-        return handler(args)
+        category = TOOL_CATEGORY.get(tool_name, "unknown")
+        logger.info("[MCP TOOL] %s(%s) [category=%s]", tool_name, args, category)
+        result = handler(args)
+        logger.debug("[MCP RESULT] %s → %s", tool_name, str(result)[:200])
+        return result
     except Exception as e:
         logger.error("Tool '%s' error: %s", tool_name, e, exc_info=True)
         return {"error": str(e), "tool": tool_name}

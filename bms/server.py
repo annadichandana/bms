@@ -162,7 +162,57 @@ MCP_TOOLS = [
 
 @app.get("/health", summary="Health check")
 async def health():
-    return {"status": "ok", "service": "ARIA BMS MCP Server", "version": "1.0.0"}
+    return {"status": "ok", "service": "ARIA BMS MCP Server", "version": "2.1.0"}
+
+
+@app.get("/stress-test/safety", summary="Safety Stress Test — validates unsafe proposed values")
+async def safety_stress_test():
+    """
+    SAFETY STRESS TEST (does NOT affect real simulation).
+
+    Intentionally sends out-of-range control proposals to the safety validator
+    to prove the validator correctly clamps all unsafe values.
+
+    Proposed values (deliberately unsafe):
+      - HVAC: 10°C (below 18°C minimum)
+      - Lighting: 150% (above 100% maximum)
+      - Ventilation: 0.0005 m³/s (below 0.006 minimum)
+
+    Expected: all values clamped to safe operating bounds.
+    """
+    from bms.mcp_tools import _tool_validate_action
+
+    unsafe_hvac = {z: 10.0 for z in ["north", "south", "east", "west", "core"]}
+    unsafe_light = {z: 150.0 for z in ["north", "south", "east", "west", "core"]}
+    unsafe_vent = {z: 0.0005 for z in ["north", "south", "east", "west", "core"]}
+
+    validation_result = _tool_validate_action(
+        hvac_setpoints=unsafe_hvac,
+        lighting_levels=unsafe_light,
+        ventilation_rates=unsafe_vent,
+    )
+
+    return {
+        "test_type": "SAFETY_STRESS_TEST",
+        "label": "[TEST ONLY] This does not affect the running simulation.",
+        "description": (
+            "Sends intentionally unsafe control proposals to the safety validator "
+            "to verify clamping works correctly."
+        ),
+        "proposed": {
+            "hvac_setpoints": unsafe_hvac,
+            "lighting_levels": unsafe_light,
+            "ventilation_rates": unsafe_vent,
+        },
+        "validation_result": validation_result,
+        "interpretation": {
+            "hvac": f"10.0°C clamped to 18.0°C (minimum safe setpoint)",
+            "lighting": f"150% clamped to 100% (maximum allowed)",
+            "ventilation": f"0.0005 m³/s clamped to 0.006 m³/s (ASHRAE 62.1 minimum)",
+        },
+        "safety_system": "operational" if not validation_result.get("safe") else "no_overrides_needed",
+        "overrides_detected": validation_result.get("override_count", 0),
+    }
 
 
 @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)

@@ -289,5 +289,4 @@ smart-building-bms/
 │   └── simulation.log
 └── docs/
     ├── architecture.md          ← This file
-    └── banner.png
 ```

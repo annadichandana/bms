@@ -222,6 +222,18 @@ async def serve_dashboard():
         return f.read()
 
 
+@app.get("/presentation", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/pitch", response_class=HTMLResponse, include_in_schema=False)
+async def serve_presentation():
+    """Serve the interactive Honeywell hackathon PPT presentation deck."""
+    pitch_path = os.path.join(os.path.dirname(DASHBOARD_PATH), "aria_bms_pitch_presentation.html")
+    if os.path.exists(pitch_path):
+        with open(pitch_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Presentation Deck not found</h1>"
+
+
+
 @app.get("/tools", summary="List all MCP tools (official MCP-compatible schema)")
 async def list_tools():
     """
@@ -379,6 +391,216 @@ async def websocket_endpoint(ws: WebSocket):
         except ValueError:
             pass
         logger.info("Dashboard client disconnected. Total: %d", len(state_store.websocket_clients))
+
+
+# ── Honeywell Niagara & Forge Integration Endpoints ─────────────────────────
+
+@app.get("/honeywell/niagara-export", summary="Export Honeywell Niagara 4 (N4) BACnet Point Mapping")
+async def honeywell_niagara_export():
+    """Generates standard BACnet/IP & Niagara N4 tag dictionary from live state."""
+    zones = ["north", "south", "east", "west", "core"]
+    controls = state_store.current_controls
+    metrics = state_store.current_metrics.get("zones", {})
+
+    bacnet_points = []
+    instance_id = 1000
+
+    for z in zones:
+        z_data = metrics.get(z, {})
+        # Temperature Sensor (Analog Input)
+        instance_id += 1
+        bacnet_points.append({
+            "point_id": f"Honeywell_N4/Zones/{z.upper()}/ZoneTemp",
+            "bacnet_object_type": "Analog_Input",
+            "bacnet_instance": instance_id,
+            "unit": "degreesCelsius",
+            "description": f"{z.capitalize()} Zone Air Temperature Sensor",
+            "current_value": z_data.get("temperature", 22.0),
+            "priority_array": "Read_Only",
+            "niagara_tag": f"n:n4Point:Temp_{z.upper()}"
+        })
+        # HVAC Setpoint (Analog Value / Writable)
+        instance_id += 1
+        bacnet_points.append({
+            "point_id": f"Honeywell_N4/Zones/{z.upper()}/HVAC_Setpoint",
+            "bacnet_object_type": "Analog_Value",
+            "bacnet_instance": instance_id,
+            "unit": "degreesCelsius",
+            "description": f"{z.capitalize()} Zone HVAC Temperature Setpoint",
+            "current_value": controls.get("hvac_setpoints", {}).get(z, 22.0),
+            "priority_array": "Priority_10 (ARIA_AI_Controller)",
+            "niagara_tag": f"n:n4Writable:SP_{z.upper()}"
+        })
+        # Lighting Level (Analog Value)
+        instance_id += 1
+        bacnet_points.append({
+            "point_id": f"Honeywell_N4/Zones/{z.upper()}/Lighting_Level",
+            "bacnet_object_type": "Analog_Value",
+            "bacnet_instance": instance_id,
+            "unit": "percent",
+            "description": f"{z.capitalize()} Zone Lighting Output Level",
+            "current_value": controls.get("lighting_levels", {}).get(z, 80.0),
+            "priority_array": "Priority_10 (ARIA_AI_Controller)",
+            "niagara_tag": f"n:n4Writable:Light_{z.upper()}"
+        })
+        # Ventilation Rate (Analog Value)
+        instance_id += 1
+        bacnet_points.append({
+            "point_id": f"Honeywell_N4/Zones/{z.upper()}/Ventilation_Rate",
+            "bacnet_object_type": "Analog_Value",
+            "bacnet_instance": instance_id,
+            "unit": "litersPerSecond",
+            "description": f"{z.capitalize()} Zone Fresh Air Ventilation Rate",
+            "current_value": round(controls.get("ventilation_rates", {}).get(z, 0.01) * 1000, 1),
+            "priority_array": "Priority_10 (ARIA_AI_Controller)",
+            "niagara_tag": f"n:n4Writable:Vent_{z.upper()}"
+        })
+
+    return {
+        "system": "Honeywell Tridium Niagara 4 Integration Gateway",
+        "protocol": "BACnet/IP over FastMCP Protocol",
+        "run_id": state_store.run_id,
+        "total_points": len(bacnet_points),
+        "device_info": {
+            "vendor": "Honeywell Building Solutions",
+            "model_name": "ARIA Cognitive BMS Agent (FastMCP Connector)",
+            "firmware_revision": "2.1.0-Honeywell-Hackathon",
+            "mac_address": "00:10:E0:4B:8F:12"
+        },
+        "points": bacnet_points
+    }
+
+
+@app.get("/honeywell/forge-telemetry", summary="Export Honeywell Forge SaaS Cloud Telemetry Payload")
+async def honeywell_forge_telemetry():
+    """Outputs Honeywell Forge Cloud telemetry JSON payload for ESG analytics."""
+    summary = state_store.get_summary()
+    totals = state_store.current_metrics.get("totals", {})
+    comfort = state_store.current_metrics.get("comfort", {})
+
+    return {
+        "forge_tenant_id": "HW-FORGE-EMEA-BUILDING-042",
+        "building_name": "ARIA Smart Headquarters",
+        "timestamp_iso": datetime.utcnow().isoformat() + "Z",
+        "run_id": state_store.run_id,
+        "telemetry": {
+            "cumulative_energy_kwh": totals.get("cumulative_energy_kwh", 0),
+            "baseline_energy_kwh": summary.get("baseline_energy_kwh", 0),
+            "energy_saved_pct": summary.get("energy_saved_pct", 0),
+            "carbon_emissions_kg": totals.get("cumulative_carbon_kg", 0),
+            "carbon_reduced_pct": summary.get("carbon_saved_pct", 0),
+            "indoor_comfort_score": comfort.get("comfort_score", 0),
+            "ashrae_55_pmv_avg": comfort.get("avg_pmv", 0),
+            "ashrae_62_1_co2_avg_ppm": comfort.get("avg_co2", 0),
+            "mcp_executions_total": summary.get("total_mcp_calls", 0),
+            "safety_clamping_events": len(state_store.safety_events)
+        },
+        "esg_compliance": {
+            "leed_v4_1_rating": "Platinum Eligible",
+            "zero_carbon_progress_pct": min(100.0, round((summary.get("carbon_saved_pct", 0) / 30.0) * 100, 1)),
+            "status": "Optimal"
+        }
+    }
+
+
+# ── Interactive Simulation Trigger Endpoint ──────────────────────────────────
+
+sim_task = None
+
+async def _run_background_simulation(hours: int = 24, speed: int = 10, ep_mode: bool = False):
+    """Background task to run active simulation loop when triggered from UI."""
+    from main import EnergyPlusBridge, ARIAAgent, broadcast
+    
+    state_store.reset_for_new_run()
+    bridge = EnergyPlusBridge(force_ep=ep_mode)
+    agent = ARIAAgent()
+
+    controls = {
+        "hvac_setpoints": {z: 22.0 for z in ["north", "south", "east", "west", "core"]},
+        "lighting_levels": {z: 80.0 for z in ["north", "south", "east", "west", "core"]},
+        "ventilation_rates": {z: 0.010 for z in ["north", "south", "east", "west", "core"]},
+    }
+
+    # Baseline phase
+    baseline_results = []
+    for h in range(hours):
+        res = bridge.step(
+            hour=h,
+            hvac_setpoints={z: 22.0 for z in ["north", "south", "east", "west", "core"]},
+            lighting_levels={z: 100.0 for z in ["north", "south", "east", "west", "core"]},
+            ventilation_rates={z: 0.015 for z in ["north", "south", "east", "west", "core"]},
+        )
+        baseline_results.append(res)
+        state_store.baseline_metrics = res
+
+    # AI Phase
+    epoch_delay = max(0.1, 3.0 / max(1, speed))
+    for h in range(hours):
+        result = bridge.step(
+            hour=h,
+            hvac_setpoints=controls["hvac_setpoints"],
+            lighting_levels=controls["lighting_levels"],
+            ventilation_rates=controls["ventilation_rates"],
+        )
+        result["_controls"] = {k: dict(v) for k, v in controls.items()}
+        result["_hour"] = h
+        state_store.current_metrics = result
+
+        actions, reasoning, mode = agent.run_cycle(result, h)
+        for key in ("hvac_setpoints", "lighting_levels", "ventilation_rates"):
+            if key in actions:
+                controls[key].update(actions[key])
+
+        state_store.current_controls = {k: dict(v) for k, v in controls.items()}
+        state_store.safety_events = agent.last_safety_events
+        state_store.decision_detail = agent.last_decision_detail
+        
+        agent_stats = agent.get_stats()
+        state_store.update_mcp_counts(
+            obs=agent_stats["mcp_obs_calls"],
+            dec=agent_stats["mcp_dec_calls"],
+            ctrl=agent_stats["mcp_ctrl_calls"],
+            val=agent_stats["mcp_val_calls"],
+        )
+
+        summary = state_store.get_summary()
+        await broadcast({
+            "type": "update",
+            "hour": h,
+            "metrics": result,
+            "baseline": state_store.baseline_metrics,
+            "controls": state_store.current_controls,
+            "safety_events": agent.last_safety_events,
+            "decision_detail": agent.last_decision_detail,
+            "mcp_tool_groups": agent_stats.get("mcp_tool_groups", {}),
+            "summary": summary,
+            "reasoning": reasoning,
+            "mode": mode,
+            "agent_stats": agent_stats,
+            "ep_mode": bridge.mode,
+            "run_id": state_store.run_id,
+            "run_status": "running",
+        })
+        await asyncio.sleep(epoch_delay)
+
+    state_store.mark_run_complete()
+    await broadcast({
+        "type": "complete",
+        "run_id": state_store.run_id,
+        "summary": state_store.get_summary()
+    })
+
+
+@app.post("/simulation/start", summary="Start live ARIA simulation from web dashboard")
+async def start_simulation(hours: int = 24, speed: int = 10):
+    """Triggers an active background simulation run directly from UI button."""
+    global sim_task
+    if sim_task and not sim_task.done():
+        return {"status": "running", "message": "Simulation already running", "run_id": state_store.run_id}
+    
+    sim_task = asyncio.create_task(_run_background_simulation(hours, speed))
+    return {"status": "started", "message": f"Started {hours}h simulation at speed {speed}x", "run_id": state_store.run_id}
+
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

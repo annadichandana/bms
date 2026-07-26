@@ -1,0 +1,43 @@
+# ARIA BMS — Python Dependencies
+# ================================
+# Install: pip install -r requirements.txt
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+
+# ── HTTP client (Groq API + Ollama) ──────────────────────────────────────────
+httpx>=0.26.0
+
+# ── Data & math ───────────────────────────────────────────────────────────────
+numpy>=1.24.0
+pandas>=2.0.0
+pydantic>=2.0.0
+
+# ── MCP — Official Model Context Protocol SDK (Anthropic) ────────────────────
+# Used for: FastMCP server, MCP tool definitions, MCP protocol compliance
+mcp>=1.0.0
+
+# ── Groq — Cloud LLM API (LLaMA 3.3 70B with tool calling) ──────────────────
+groq>=0.7.0
+
+# ── Ollama — Local LLM client (phi3:mini / llama3.2:3b fallback) ─────────────
+ollama>=0.3.0
+
+# ── EnergyPlus — Python API (pyenergyplus is bundled with EnergyPlus install) ─
+# pyenergyplus is available when EnergyPlus 23.1+ is installed.
+# For pre-processing IDF files without full EnergyPlus:
+eppy>=0.5.63
+
+# ── Environment & utilities ───────────────────────────────────────────────────
+python-dotenv>=1.0.0
+aiofiles>=23.2.1
+jinja2>=3.1.0
+
+# ── Persistence ───────────────────────────────────────────────────────────────
+# SQLite is built into Python — no extra package needed
+
+# Optional: APScheduler for alternative tick scheduling
+# apscheduler>=3.10.0

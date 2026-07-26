@@ -1,0 +1,407 @@
+ !-Generator IDFEditor 1.51
+ !-Option OriginalOrderTop UseSpecialFormat
+ !-NOTE: All string comparisons are case insensitive
+
+ !======================================================================
+ ! EnergyPlus Building Model: Multi-Zone Commercial Office Building
+ ! Honeywell Smart Building BMS Hackathon 2024
+ ! 
+ ! Zones:
+ !   1. Open Office      - 400 m², 50 occupants, primary work area
+ !   2. Main Lobby       - 120 m², variable occupancy, high-glazing facade
+ !   3. Server Room      -  80 m², no occupants, high constant heat gain
+ !
+ ! Note: This IDF file is provided for documentation/EnergyPlus integration.
+ ! The BMS system uses a physics-based mock wrapper when EnergyPlus is not
+ ! installed, implementing equivalent thermal mass equations.
+ !======================================================================
+
+ Version,
+  24.1;                    !- Version Identifier
+
+ Building,
+  Multi-Zone Office Building,  !- Name
+  0.0,                         !- North Axis {deg}
+  City,                        !- Terrain
+  0.04,                        !- Loads Convergence Tolerance Value {W}
+  0.4,                         !- Temperature Convergence Tolerance Value {deltaC}
+  FullInteriorAndExterior,     !- Solar Distribution
+  25,                          !- Maximum Number of Warmup Days
+  6;                           !- Minimum Number of Warmup Days
+
+ Timestep,4;                   !- Number of Timesteps per Hour (15-min intervals)
+
+ SimulationControl,
+  Yes,                         !- Do Zone Sizing Calculation
+  Yes,                         !- Do System Sizing Calculation
+  Yes,                         !- Do Plant Sizing Calculation
+  No,                          !- Run Simulation for Sizing Periods
+  Yes;                         !- Run Simulation for Weather File Run Periods
+
+ RunPeriod,
+  Annual Simulation,           !- Name
+  1,                           !- Begin Month
+  1,                           !- Begin Day of Month
+  ,                            !- Begin Year
+  12,                          !- End Month
+  31,                          !- End Day of Month
+  ,                            !- End Year
+  Tuesday,                     !- Day of Week for Start Day
+  Yes,                         !- Use Weather File Holidays and Special Days
+  Yes,                         !- Use Weather File DST
+  No,                          !- Apply Weekend Holiday Rule
+  Yes,                         !- Use Weather File Rain Indicators
+  Yes;                         !- Use Weather File Snow Indicators
+
+ !-   ===========  ALL OBJECTS IN CLASS: SITE:LOCATION ===========
+
+ Site:Location,
+  Typical Commercial Office Site,  !- Name
+  28.61,                            !- Latitude {deg}
+  77.20,                            !- Longitude {deg}
+  5.5,                              !- Time Zone {hr}
+  216.0;                            !- Elevation {m}
+
+ !-   ===========  MATERIAL AND CONSTRUCTION ===========
+
+ Material,
+  Concrete 200mm,              !- Name
+  MediumRough,                 !- Roughness
+  0.2000,                      !- Thickness {m}
+  1.7300,                      !- Conductivity {W/m-K}
+  2300.0,                      !- Density {kg/m3}
+  832.00,                      !- Specific Heat {J/kg-K}
+  0.9000,                      !- Thermal Absorptance
+  0.7000,                      !- Solar Absorptance
+  0.7000;                      !- Visible Absorptance
+
+ Material,
+  Insulation 100mm,            !- Name
+  Rough,                       !- Roughness
+  0.1000,                      !- Thickness {m}
+  0.0350,                      !- Conductivity {W/m-K}
+  32.000,                      !- Density {kg/m3}
+  830.00,                      !- Specific Heat {J/kg-K}
+  0.9000,                      !- Thermal Absorptance
+  0.5000,                      !- Solar Absorptance
+  0.5000;                      !- Visible Absorptance
+
+ Material,
+  Gypsum Board 12mm,           !- Name
+  Smooth,                      !- Roughness
+  0.0127,                      !- Thickness {m}
+  0.1600,                      !- Conductivity {W/m-K}
+  800.000,                     !- Density {kg/m3}
+  1090.0,                      !- Specific Heat {J/kg-K}
+  0.9000,                      !- Thermal Absorptance
+  0.4000,                      !- Solar Absorptance
+  0.4000;                      !- Visible Absorptance
+
+ WindowMaterial:SimpleGlazingSystem,
+  Double Glazing Low-E,        !- Name
+  1.80,                        !- U-Factor {W/m2-K}
+  0.39;                        !- Solar Heat Gain Coefficient
+
+ Construction,
+  Exterior Wall,               !- Name
+  Concrete 200mm,              !- Outside Layer
+  Insulation 100mm,            !- Layer 2
+  Gypsum Board 12mm;           !- Layer 3
+
+ Construction,
+  Interior Wall,               !- Name
+  Gypsum Board 12mm,           !- Outside Layer
+  Gypsum Board 12mm;           !- Layer 2
+
+ Construction,
+  Roof Slab,                   !- Name
+  Concrete 200mm,              !- Outside Layer
+  Insulation 100mm,            !- Layer 2
+  Gypsum Board 12mm;           !- Layer 3
+
+ Construction,
+  Floor Slab,                  !- Name
+  Concrete 200mm;              !- Outside Layer
+
+ Construction,
+  Window Construction,         !- Name
+  Double Glazing Low-E;        !- Outside Layer
+
+ !-   ===========  ZONE DEFINITIONS ===========
+
+ Zone,
+  Office Zone,                 !- Name
+  0.0,                         !- Direction of Relative North {deg}
+  0.0,                         !- X Origin {m}
+  0.0,                         !- Y Origin {m}
+  0.0,                         !- Z Origin {m}
+  1,                           !- Type
+  1,                           !- Multiplier
+  autocalculate,               !- Ceiling Height {m}
+  autocalculate;               !- Volume {m3}
+
+ Zone,
+  Lobby Zone,                  !- Name
+  0.0,                         !- Direction of Relative North {deg}
+  20.0,                        !- X Origin {m}
+  0.0,                         !- Y Origin {m}
+  0.0,                         !- Z Origin {m}
+  1,                           !- Type
+  1,                           !- Multiplier
+  autocalculate,               !- Ceiling Height {m}
+  autocalculate;               !- Volume {m3}
+
+ Zone,
+  Server Room Zone,            !- Name
+  0.0,                         !- Direction of Relative North {deg}
+  30.0,                        !- X Origin {m}
+  0.0,                         !- Y Origin {m}
+  0.0,                         !- Z Origin {m}
+  1,                           !- Type
+  1,                           !- Multiplier
+  autocalculate,               !- Ceiling Height {m}
+  autocalculate;               !- Volume {m3}
+
+ !-   ===========  SCHEDULES ===========
+
+ ScheduleTypeLimits,
+  Fraction,                    !- Name
+  0.0,                         !- Lower Limit Value
+  1.0,                         !- Upper Limit Value
+  CONTINUOUS;                  !- Numeric Type
+
+ ScheduleTypeLimits,
+  Temperature,                 !- Name
+  -60,                         !- Lower Limit Value
+  200,                         !- Upper Limit Value
+  CONTINUOUS,                  !- Numeric Type
+  Temperature;                 !- Unit Type
+
+ Schedule:Compact,
+  Office Occupancy Schedule,   !- Name
+  Fraction,                    !- Schedule Type Limits Name
+  Through: 12/31,
+  For: Weekdays,
+  Until: 07:00, 0.0,
+  Until: 08:00, 0.3,
+  Until: 09:00, 0.7,
+  Until: 12:00, 1.0,
+  Until: 13:00, 0.6,
+  Until: 17:00, 1.0,
+  Until: 18:00, 0.5,
+  Until: 19:00, 0.2,
+  Until: 24:00, 0.0,
+  For: Weekends,
+  Until: 24:00, 0.0;
+
+ Schedule:Compact,
+  Server Room Schedule,        !- Name
+  Fraction,                    !- Schedule Type Limits Name
+  Through: 12/31,
+  For: AllDays,
+  Until: 24:00, 1.0;           !- Servers run 24/7
+
+ Schedule:Compact,
+  Office Cooling Setpoint,     !- Name
+  Temperature,                 !- Schedule Type Limits Name
+  Through: 12/31,
+  For: Weekdays,
+  Until: 07:00, 28.0,
+  Until: 22:00, 24.0,
+  Until: 24:00, 28.0,
+  For: Weekends,
+  Until: 24:00, 28.0;
+
+ Schedule:Compact,
+  Server Room Cooling Setpoint,  !- Name
+  Temperature,                   !- Schedule Type Limits Name
+  Through: 12/31,
+  For: AllDays,
+  Until: 24:00, 20.0;
+
+ !-   ===========  PEOPLE (INTERNAL GAINS) ===========
+
+ People,
+  Office People,               !- Name
+  Office Zone,                 !- Zone or ZoneList Name
+  Office Occupancy Schedule,   !- Number of People Schedule Name
+  People,                      !- Number of People Calculation Method
+  50,                          !- Number of People
+  ,                            !- People per Zone Floor Area {person/m2}
+  ,                            !- Zone Floor Area per Person {m2/person}
+  0.3,                         !- Fraction Radiant
+  autocalculate,               !- Sensible Heat Fraction
+  Activity Schedule;           !- Activity Level Schedule Name
+
+ Schedule:Compact,
+  Activity Schedule,           !- Name
+  ,                            !- Schedule Type Limits Name
+  Through: 12/31,
+  For: AllDays,
+  Until: 24:00, 120;           !- 120 W metabolic rate (office work)
+
+ !-   ===========  LIGHTS ===========
+
+ Lights,
+  Office Lights,               !- Name
+  Office Zone,                 !- Zone or ZoneList Name
+  Office Occupancy Schedule,   !- Schedule Name
+  Watts/Area,                  !- Design Level Calculation Method
+  ,                            !- Lighting Level {W}
+  10.0,                        !- Watts per Zone Floor Area {W/m2}
+  ,                            !- Watts per Person {W/person}
+  0.0,                         !- Return Air Fraction
+  0.59,                        !- Fraction Radiant
+  0.19,                        !- Fraction Visible
+  1.0,                         !- Fraction Replaceable
+  GeneralLights;               !- End-Use Subcategory
+
+ Lights,
+  Lobby Lights,                !- Name
+  Lobby Zone,                  !- Zone or ZoneList Name
+  Office Occupancy Schedule,   !- Schedule Name
+  Watts/Area,                  !- Design Level Calculation Method
+  ,                            !- Lighting Level {W}
+  8.0,                         !- Watts per Zone Floor Area {W/m2}
+  ,                            !- Watts per Person
+  0.0,                         !- Return Air Fraction
+  0.59,                        !- Fraction Radiant
+  0.19,                        !- Fraction Visible
+  1.0,                         !- Fraction Replaceable
+  GeneralLights;               !- End-Use Subcategory
+
+ Lights,
+  Server Room Lights,          !- Name
+  Server Room Zone,            !- Zone or ZoneList Name
+  Server Room Schedule,        !- Schedule Name
+  Watts/Area,                  !- Design Level Calculation Method
+  ,                            !- Lighting Level {W}
+  5.0,                         !- Watts per Zone Floor Area {W/m2}
+  ,                            !- Watts per Person
+  0.0,                         !- Return Air Fraction
+  0.59,                        !- Fraction Radiant
+  0.19,                        !- Fraction Visible
+  1.0,                         !- Fraction Replaceable
+  GeneralLights;               !- End-Use Subcategory
+
+ !-   ===========  EQUIPMENT (PLUG LOADS) ===========
+
+ ElectricEquipment,
+  Office Equipment,            !- Name
+  Office Zone,                 !- Zone or ZoneList Name
+  Office Occupancy Schedule,   !- Schedule Name
+  Watts/Area,                  !- Design Level Calculation Method
+  ,                            !- Design Level {W}
+  15.0,                        !- Watts per Zone Floor Area {W/m2}
+  ,                            !- Watts per Person
+  0.5,                         !- Fraction Latent
+  0.5,                         !- Fraction Radiant
+  0.0;                         !- Fraction Lost
+
+ ElectricEquipment,
+  Server Equipment,            !- Name
+  Server Room Zone,            !- Zone or ZoneList Name
+  Server Room Schedule,        !- Schedule Name
+  Watts/Area,                  !- Design Level Calculation Method
+  ,                            !- Design Level {W}
+  250.0,                       !- Watts per Zone Floor Area {W/m2} (20kW servers)
+  ,                            !- Watts per Person
+  0.0,                         !- Fraction Latent
+  1.0,                         !- Fraction Radiant
+  0.0;                         !- Fraction Lost
+
+ !-   ===========  HVAC: IDEAL AIR LOADS ===========
+
+ ZoneHVAC:IdealLoadsAirSystem,
+  Office HVAC,                 !- Name
+  ,                            !- Availability Schedule Name
+  Office Zone Inlet Node,      !- Zone Supply Air Node Name
+  Office Zone Exhaust Node,    !- Zone Exhaust Air Node Name
+  ,                            !- System Inlet Air Node Name
+  50,                          !- Maximum Heating Supply Air Temperature {C}
+  13,                          !- Minimum Cooling Supply Air Temperature {C}
+  0.0156,                      !- Maximum Heating Supply Air Humidity Ratio {kgWater/kgDryAir}
+  0.0077,                      !- Minimum Cooling Supply Air Humidity Ratio {kgWater/kgDryAir}
+  NoLimit,                     !- Heating Limit
+  ,                            !- Maximum Heating Air Flow Rate {m3/s}
+  ,                            !- Maximum Sensible Heating Capacity {W}
+  LimitCapacity,               !- Cooling Limit
+  ,                            !- Maximum Cooling Air Flow Rate {m3/s}
+  60000,                       !- Maximum Total Cooling Capacity {W}
+  ,                            !- Heating Availability Schedule Name
+  ,                            !- Cooling Availability Schedule Name
+  ConstantSensibleHeatRatio,   !- Dehumidification Control Type
+  0.7,                         !- Cooling Sensible Heat Ratio {dimensionless}
+  None,                        !- Humidification Control Type
+  ,                            !- Design Specification Outdoor Air Object Name
+  ,                            !- Outdoor Air Inlet Node Name
+  None,                        !- Demand Controlled Ventilation Type
+  NoEconomizer,                !- Outdoor Air Economizer Type
+  None,                        !- Heat Recovery Type
+  0.70,                        !- Sensible Heat Recovery Effectiveness {dimensionless}
+  0.65;                        !- Latent Heat Recovery Effectiveness {dimensionless}
+
+ ZoneHVAC:IdealLoadsAirSystem,
+  Server Room HVAC,            !- Name
+  ,                            !- Availability Schedule Name
+  Server Zone Inlet Node,      !- Zone Supply Air Node Name
+  Server Zone Exhaust Node,    !- Zone Exhaust Air Node Name
+  ,                            !- System Inlet Air Node Name
+  50,                          !- Maximum Heating Supply Air Temperature {C}
+  10,                          !- Minimum Cooling Supply Air Temperature {C}
+  0.0156,                      !- Maximum Heating Supply Air Humidity Ratio
+  0.0077,                      !- Minimum Cooling Supply Air Humidity Ratio
+  NoLimit,                     !- Heating Limit
+  ,                            !- Maximum Heating Air Flow Rate {m3/s}
+  ,                            !- Maximum Sensible Heating Capacity {W}
+  LimitCapacity,               !- Cooling Limit
+  ,                            !- Maximum Cooling Air Flow Rate {m3/s}
+  40000,                       !- Maximum Total Cooling Capacity {W} (40kW for servers)
+  ,                            !- Heating Availability Schedule Name
+  ,                            !- Cooling Availability Schedule Name
+  ConstantSensibleHeatRatio,   !- Dehumidification Control Type
+  0.7,                         !- Cooling Sensible Heat Ratio
+  None,                        !- Humidification Control Type
+  ,                            !- Design Specification Outdoor Air Object Name
+  ,                            !- Outdoor Air Inlet Node Name
+  None,                        !- Demand Controlled Ventilation Type
+  NoEconomizer,                !- Outdoor Air Economizer Type
+  None,                        !- Heat Recovery Type
+  0.70,                        !- Sensible Heat Recovery Effectiveness
+  0.65;                        !- Latent Heat Recovery Effectiveness
+
+ !-   ===========  THERMOSTAT ===========
+
+ ThermostatSetpoint:DualSetpoint,
+  Office Thermostat,           !- Name
+  Office Heating Setpoint,     !- Heating Setpoint Temperature Schedule Name
+  Office Cooling Setpoint;     !- Cooling Setpoint Temperature Schedule Name
+
+ Schedule:Compact,
+  Office Heating Setpoint,     !- Name
+  Temperature,                 !- Schedule Type Limits Name
+  Through: 12/31,
+  For: AllDays,
+  Until: 24:00, 20.0;
+
+ !-   ===========  OUTPUT VARIABLES ===========
+
+ Output:Variable,*,Zone Mean Air Temperature,TimeStep;
+ Output:Variable,*,Zone Mechanical Ventilation Current Density Volume Flow Rate,TimeStep;
+ Output:Variable,*,Zone People Occupant Count,TimeStep;
+ Output:Variable,*,Zone Lights Electric Power,TimeStep;
+ Output:Variable,*,Zone Electric Equipment Electric Power,TimeStep;
+ Output:Variable,*,Zone Ideal Loads Cooling Rate,TimeStep;
+ Output:Variable,*,Zone Ideal Loads Heating Rate,TimeStep;
+ Output:Variable,*,Zone Ideal Loads Electric Energy,TimeStep;
+ Output:Variable,*,Zone Air Relative Humidity,TimeStep;
+ Output:Variable,*,Zone Air CO2 Concentration,TimeStep;
+
+ Output:Meter,Electricity:Building,TimeStep;
+ Output:Meter,Electricity:HVAC,TimeStep;
+ Output:Meter,Electricity:Facility,TimeStep;
+
+ OutputControl:Table:Style,HTML;
+
+ Output:Table:SummaryReports,
+  AllSummary;

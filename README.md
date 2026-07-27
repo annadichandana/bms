@@ -1,7 +1,5 @@
-# ARIA BMS v2.0 — AI-Powered Autonomous Smart Building Optimization
+# AI-Powered Autonomous Smart Building Optimization
 <div align="center">
-
-![ARIA BMS Banner](docs/banner.png)
 
 **A**utonomous **R**esource **I**ntelligence **A**gent for Building Management Systems
 
@@ -16,15 +14,15 @@
 
 ---
 
-## 🎯 What is ARIA?
+## What is ARIA?
 
 ARIA is a **closed-loop, AI-powered Building Management System** that autonomously optimizes energy consumption while maintaining occupant comfort and carbon goals. It integrates:
 
-- 🏢 **EnergyPlus Python API** — real co-simulation via `pyenergyplus` (with physics fallback)
-- 🧠 **LLaMA 3.3 70B via Groq** with **official MCP tool calling** (13 BMS tools)
-- 🔌 **FastMCP SDK** — Anthropic's official Model Context Protocol implementation
-- ⚡ **Real-time optimization** of HVAC, lighting, and ventilation
-- 📊 **Live dashboard** with carbon budget bars, MCP call counter, AI reasoning log
+- **EnergyPlus Python API** — real co-simulation via `pyenergyplus` (with physics fallback)
+- **LLaMA 3.3 70B via Groq** with **official MCP tool calling** (13 BMS tools)
+- **FastMCP SDK** — Anthropic's official Model Context Protocol implementation
+- **Real-time optimization** of HVAC, lighting, and ventilation
+- **Live dashboard** with carbon budget bars, MCP call counter, AI reasoning log
 
 ### Key Results
 | Metric | Baseline | AI-Optimized | Improvement |
@@ -81,7 +79,7 @@ See [docs/architecture.md](docs/architecture.md) for the full detailed architect
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.10+
@@ -132,7 +130,7 @@ npm run dev
 
 ---
 
-## 🧠 How the AI Works (MCP Tool-Calling Loop)
+## How the AI Works (MCP Tool-Calling Loop)
 
 ARIA uses **LLaMA 3.3 70B via Groq** with the **official MCP Python SDK (FastMCP)**:
 
@@ -164,7 +162,7 @@ ARIA [09:45 Groq+MCP | 8 tool calls]:
 
 ---
 
-## 🔌 MCP Tool Calling
+## MCP Tool Calling
 
 The MCP server is built with the **official Anthropic FastMCP SDK**:
 
@@ -183,7 +181,7 @@ All 13 tools are inspectable at **http://localhost:8000/tools** and **http://loc
 
 ---
 
-## ⚡ EnergyPlus Integration
+## EnergyPlus Integration
 
 ### Real Mode (when EnergyPlus 23.1+ is installed)
 ```python
@@ -209,7 +207,7 @@ Validated against EnergyPlus reference simulations.
 
 ---
 
-## 🏢 Building Model
+## Building Model
 
 **File**: `building_models/multi_zone_office.idf` (EnergyPlus v24.1)
 
@@ -226,7 +224,7 @@ Validated against EnergyPlus reference simulations.
 
 ---
 
-## 📊 Dashboard Features
+## Dashboard Features
 
 | Feature | Description |
 |---------|-------------|
@@ -243,7 +241,7 @@ Validated against EnergyPlus reference simulations.
 
 ---
 
-## 🛠️ MCP Tools Reference
+## MCP Tools Reference
 
 ```http
 GET  /tools      → List all 13 tools with schemas (MCP-compatible format)
@@ -256,7 +254,7 @@ WS   /ws         → WebSocket live feed (JSON updates at each sim step)
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 smart-building-bms/
@@ -320,14 +318,3 @@ CARBON_FACTOR_KG_PER_KWH=0.485     # kg CO₂/kWh (India grid)
 | **Architecture Docs** | Full diagram, data flow, component details | ✅ |
 | **Savings Dashboard** | Live budget bars, carbon tracking, AI log, EP badge | ✅ |
 
----
-
-## 📜 License
-
-MIT License — AI Smart Building Optimization Challenge
-
----
-
-<div align="center">
-Made with ❤️ using LLaMA 3.3, Groq, FastMCP (MCP SDK), EnergyPlus, FastAPI, and React
-</div>

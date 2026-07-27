@@ -1,6 +1,4 @@
 # ARIA BMS v2.0 — AI-Powered Autonomous Smart Building Optimization
-### 🏆 AI Smart Building Optimization Challenge Submission
-
 <div align="center">
 
 ![ARIA BMS Banner](docs/banner.png)
@@ -13,7 +11,6 @@
 [![LLaMA 3.3](https://img.shields.io/badge/LLaMA_3.3-70B-purple?style=flat-square)](https://groq.com)
 [![MCP](https://img.shields.io/badge/MCP-FastMCP_SDK-blue?style=flat-square)](https://github.com/anthropics/mcp)
 [![EnergyPlus](https://img.shields.io/badge/EnergyPlus-24.1-orange?style=flat-square)](https://energyplus.net)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 </div>
 

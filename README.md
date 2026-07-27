@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 # AI-Powered Autonomous Smart Building Optimization
+=======
+ AI-Powered Autonomous Smart Building Optimizatio
+
+
+>>>>>>> fed2db6 (added demo video)
 <div align="center">
 
 **A**utonomous **R**esource **I**ntelligence **A**gent for Building Management Systems
